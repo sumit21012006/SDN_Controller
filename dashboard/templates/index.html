@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SDN DDoS Protection Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-900 text-slate-100 font-sans min-h-screen">
+    <nav class="bg-slate-800 border-b border-slate-700 px-6 py-4 flex justify-between items-center shadow-lg">
+        <div class="flex items-center space-x-3">
+            <i class="fa-solid fa-shield-halved text-cyan-400 text-2xl"></i>
+            <div>
+                <h1 class="text-xl font-bold tracking-wide text-white">SDN DDoS Protection Center</h1>
+                <p class="text-xs text-slate-400">Ryu OpenFlow 1.3 Statistical Traffic Monitor & Detector</p>
+            </div>
+        </div>
+        <div class="flex items-center space-x-4">
+            <div class="text-right">
+                <p class="text-xs text-slate-400">Protected Target Server</p>
+                <p class="text-sm font-mono text-cyan-300 font-semibold"><i class="fa-solid fa-server mr-1"></i> 10.0.0.200 (server1)</p>
+            </div>
+            <div id="status-badge" class="px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center space-x-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                <span id="status-text">INITIALIZING</span>
+            </div>
+        </div>
+    </nav>
+    <div class="p-6 space-y-6 max-w-7xl mx-auto">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+            <div class="bg-slate-800/80 border border-slate-700/60 rounded-xl p-5 shadow-lg backdrop-blur">
+                <div class="flex justify-between items-center text-slate-400 mb-2">
+                    <span class="text-xs font-semibold uppercase tracking-wider">Suspicion Score</span>
+                    <i class="fa-solid fa-gauge-high text-amber-400"></i>
+                </div>
+                <div class="flex items-baseline space-x-2">
+                    <span id="metric-score" class="text-3xl font-extrabold text-white">0</span>
+                    <span class="text-xs text-slate-400">/ 100</span>
+                </div>
+                <div class="w-full bg-slate-700 h-2.5 rounded-full mt-3 overflow-hidden">
+                    <div id="score-bar" class="bg-emerald-500 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+                </div>
+                <p class="text-xs text-slate-400 mt-2">Threshold: <span class="text-amber-400 font-semibold">60 / 100</span></p>
+            </div>
+            <div class="bg-slate-800/80 border border-slate-700/60 rounded-xl p-5 shadow-lg backdrop-blur">
+                <div class="flex justify-between items-center text-slate-400 mb-2">
+                    <span class="text-xs font-semibold uppercase tracking-wider">Packet Rate (PPS)</span>
+                    <i class="fa-solid fa-bolt text-cyan-400"></i>
+                </div>
+                <div class="flex items-baseline space-x-2">
+                    <span id="metric-pps" class="text-3xl font-extrabold text-white">0.0</span>
+                    <span class="text-xs text-slate-400">pkts/sec</span>
+                </div>
+                <p class="text-xs text-slate-400 mt-4"><i class="fa-solid fa-circle-info text-cyan-400 mr-1"></i> Normal range: &lt; 15 pps</p>
+            </div>
+            <div class="bg-slate-800/80 border border-slate-700/60 rounded-xl p-5 shadow-lg backdrop-blur">
+                <div class="flex justify-between items-center text-slate-400 mb-2">
+                    <span class="text-xs font-semibold uppercase tracking-wider">Byte Rate (Bandwidth)</span>
+                    <i class="fa-solid fa-network-wired text-indigo-400"></i>
+                </div>
+                <div class="flex items-baseline space-x-2">
+                    <span id="metric-bps" class="text-3xl font-extrabold text-white">0.0</span>
+                    <span class="text-xs text-slate-400">Kbps</span>
+                </div>
+                <p class="text-xs text-slate-400 mt-4"><i class="fa-solid fa-chart-area text-indigo-400 mr-1"></i> Dynamic Baseline Polling</p>
+            </div>
+            <div class="bg-slate-800/80 border border-slate-700/60 rounded-xl p-5 shadow-lg backdrop-blur">
+                <div class="flex justify-between items-center text-slate-400 mb-2">
+                    <span class="text-xs font-semibold uppercase tracking-wider">Flows & Concentration</span>
+                    <i class="fa-solid fa-diagram-project text-purple-400"></i>
+                </div>
+                <div class="flex justify-between items-center mt-1">
+                    <div>
+                        <p class="text-xs text-slate-400">Active Flows</p>
+                        <p id="metric-flows" class="text-xl font-bold text-white">0</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-xs text-slate-400">Dominant Conc.</p>
+                        <p id="metric-conc" class="text-xl font-bold text-purple-300">0.0%</p>
+                    </div>
+                </div>
+                <p id="metric-sources" class="text-xs text-slate-400 mt-3"><i class="fa-solid fa-users text-purple-400 mr-1"></i> Unique Sources: 0</p>
+            </div>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-slate-800/80 border border-slate-700/60 rounded-xl p-5 shadow-lg">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-sm font-bold uppercase tracking-wider text-slate-200"><i class="fa-solid fa-chart-line text-cyan-400 mr-2"></i> Real-Time Packet Rate (PPS)</h2>
+                    <span class="text-xs text-slate-400 bg-slate-700/50 px-2.5 py-1 rounded">Live 1s Polling</span>
+                </div>
+                <div class="h-64"><canvas id="ppsChart"></canvas></div>
+            </div>
+            <div class="bg-slate-800/80 border border-slate-700/60 rounded-xl p-5 shadow-lg">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-sm font-bold uppercase tracking-wider text-slate-200"><i class="fa-solid fa-shield-cat text-amber-400 mr-2"></i> Suspicion Score & State Machine</h2>
+                    <span class="text-xs text-amber-400/80 bg-amber-400/10 px-2.5 py-1 rounded border border-amber-400/20">Threshold = 60</span>
+                </div>
+                <div class="h-64"><canvas id="scoreChart"></canvas></div>
+            </div>
+        </div>
+        <div class="bg-slate-800/80 border border-slate-700/60 rounded-xl p-5 shadow-lg">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-sm font-bold uppercase tracking-wider text-slate-200"><i class="fa-solid fa-list-check text-indigo-400 mr-2"></i> Real-Time Detection Audit Log</h2>
+                <span id="last-updated" class="text-xs text-slate-400">Updating...</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs text-slate-300">
+                    <thead class="bg-slate-900/60 text-slate-400 uppercase font-semibold">
+                        <tr>
+                            <th class="p-3">ISO Time</th>
+                            <th class="p-3">Target Server</th>
+                            <th class="p-3">Packet Rate</th>
+                            <th class="p-3">Byte Rate</th>
+                            <th class="p-3">Flows</th>
+                            <th class="p-3">Conc.</th>
+                            <th class="p-3">Score</th>
+                            <th class="p-3">Status</th>
+                            <th class="p-3">Trigger Reason</th>
+                        </tr>
+                    </thead>
+                    <tbody id="log-table-body" class="divide-y divide-slate-700/50">
+                        <tr>
+                            <td colspan="9" class="p-4 text-center text-slate-500">Waiting for Ryu controller events...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <script>
+        const ppsCtx = document.getElementById('ppsChart').getContext('2d');
+        const scoreCtx = document.getElementById('scoreChart').getContext('2d');
+        const ppsChart = new Chart(ppsCtx, {
+            type: 'line',
+            data: { labels: [], datasets: [{ label: 'Server Packet Rate (PPS)', data: [], borderColor: '#38bdf8', backgroundColor: 'rgba(56, 189, 248, 0.1)', borderWidth: 2, fill: true, tension: 0.3, pointRadius: 2 }] },
+            options: { responsive: true, maintainAspectRatio: false, scales: { x: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } }, y: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' }, beginAtZero: true } }, plugins: { legend: { labels: { color: '#cbd5e1' } } } }
+        });
+        const scoreChart = new Chart(scoreCtx, {
+            type: 'line',
+            data: { labels: [], datasets: [{ label: 'Suspicion Score (0-100)', data: [], borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.15)', borderWidth: 2, fill: true, tension: 0.2, pointRadius: 3 }, { label: 'Suspicion Threshold (60)', data: [], borderColor: '#ef4444', borderWidth: 1, borderDash: [5, 5], fill: false, pointRadius: 0 }] },
+            options: { responsive: true, maintainAspectRatio: false, scales: { x: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } }, y: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' }, min: 0, max: 100 } }, plugins: { legend: { labels: { color: '#cbd5e1' } } } }
+        });
+        async function fetchStats() {
+            try {
+                const response = await fetch('/api/stats');
+                const data = await response.json();
+                if (data.status === 'OK' && data.latest) {
+                    const latest = data.latest;
+                    document.getElementById('metric-score').innerText = latest.suspicion_score;
+                    document.getElementById('metric-pps').innerText = latest.packet_rate.toFixed(1);
+                    document.getElementById('metric-bps').innerText = latest.byte_rate.toFixed(1);
+                    document.getElementById('metric-flows').innerText = latest.active_flows;
+                    document.getElementById('metric-conc').innerText = latest.traffic_concentration.toFixed(1) + '%';
+                    document.getElementById('metric-sources').innerHTML = `<i class="fa-solid fa-users text-purple-400 mr-1"></i> Unique Sources: ${latest.unique_sources}`;
+                    const scoreBar = document.getElementById('score-bar');
+                    scoreBar.style.width = latest.suspicion_score + '%';
+                    scoreBar.className = latest.suspicion_score >= 60 ? 'bg-rose-500 h-2.5 rounded-full transition-all duration-500' : (latest.suspicion_score >= 30 ? 'bg-amber-500 h-2.5 rounded-full transition-all duration-500' : 'bg-emerald-500 h-2.5 rounded-full transition-all duration-500');
+                    const badge = document.getElementById('status-badge');
+                    document.getElementById('status-text').innerText = latest.detection_status;
+                    if (latest.detection_status === 'DDOS_DETECTED') badge.className = 'px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider bg-rose-500/20 text-rose-400 border border-rose-500/40 animate-pulse flex items-center space-x-2';
+                    else if (latest.detection_status === 'SUSPICIOUS') badge.className = 'px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center space-x-2';
+                    else if (latest.detection_status === 'BASELINE_COLLECTION') badge.className = 'px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 flex items-center space-x-2';
+                    else badge.className = 'px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center space-x-2';
+                    if (data.history && data.history.length > 0) {
+                        const labels = data.history.map(item => item.iso_time.split(' ')[1] || '');
+                        ppsChart.data.labels = labels;
+                        ppsChart.data.datasets[0].data = data.history.map(item => item.packet_rate);
+                        ppsChart.update();
+                        scoreChart.data.labels = labels;
+                        scoreChart.data.datasets[0].data = data.history.map(item => item.suspicion_score);
+                        scoreChart.data.datasets[1].data = data.history.map(() => 60);
+                        scoreChart.update();
+                        const tableBody = document.getElementById('log-table-body');
+                        const reversedHistory = [...data.history].reverse().slice(0, 10);
+                        tableBody.innerHTML = reversedHistory.map(row => {
+                            let badgeClass = 'text-emerald-400 font-semibold';
+                            if (row.detection_status === 'DDOS_DETECTED') badgeClass = 'text-rose-400 font-bold bg-rose-500/10 px-2 py-0.5 rounded';
+                            else if (row.detection_status === 'SUSPICIOUS') badgeClass = 'text-amber-400 font-semibold bg-amber-500/10 px-2 py-0.5 rounded';
+                            else if (row.detection_status === 'BASELINE_COLLECTION') badgeClass = 'text-cyan-400 font-medium';
+                            return `<tr class="hover:bg-slate-800/40 transition"><td class="p-3 font-mono text-slate-300">${row.iso_time}</td><td class="p-3 font-mono text-slate-400">${row.server_ip}</td><td class="p-3 font-semibold text-cyan-300">${row.packet_rate.toFixed(1)} pps</td><td class="p-3 text-indigo-300">${row.byte_rate.toFixed(1)} Kbps</td><td class="p-3">${row.active_flows}</td><td class="p-3 text-purple-300">${row.traffic_concentration.toFixed(1)}%</td><td class="p-3 font-bold text-amber-400">${row.suspicion_score}</td><td class="p-3"><span class="${badgeClass}">${row.detection_status}</span></td><td class="p-3 text-slate-400 text-[11px] truncate max-w-xs">${row.reason}</td></tr>`;
+                        }).join('');
+                    }
+                    document.getElementById('last-updated').innerText = 'Last updated: ' + new Date().toLocaleTimeString();
+                }
+            } catch (err) {}
+        }
+        setInterval(fetchStats, 1000);
+        fetchStats();
+    </script>
+</body>
+</html>
